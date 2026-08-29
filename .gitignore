@@ -1,0 +1,28 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+
+# Downloaded and generated data
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+output/*
+!output/README.md
+
+# Downloaded binary dependencies
+*.jar
+
+# Third-party infrastructure clone
+infrastructure/
+
+# Logs and operating-system files
+*.log
+.DS_Store
+Thumbs.db
