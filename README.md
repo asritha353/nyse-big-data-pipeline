@@ -283,6 +283,10 @@ correlation heatmap into `output/r_analysis/`.
 
 ## Execution evidence
 
+| Airflow orchestration |
+|---|
+| ![Successful Airflow DAG run](screenshots/17-airflow-dashboard-success.png) |
+
 | Spark cluster | Spark processing | Hive validation |
 |---|---|---|
 | ![Spark workers](screenshots/03-spark-workers.png) | ![Spark processing](screenshots/04-spark-processing.png) | ![Hive validation](screenshots/07-hive-validation.png) |
@@ -292,8 +296,8 @@ correlation heatmap into `output/r_analysis/`.
 | ![Price trends](screenshots/11-r-price-trends.png) | ![Return distribution](screenshots/12-r-return-distribution.png) | ![Correlation heatmap](screenshots/13-r-correlation-heatmap.png) |
 
 Additional evidence in `screenshots/` covers Docker services, HDFS inputs and
-Parquet output, Hive tables and analytics, the NameNode and YARN interfaces, and
-Spark History Server.
+Parquet output, Hive tables and analytics, the NameNode and YARN interfaces,
+Spark History Server, and the successful Airflow dashboard.
 
 ## Interpretation notes
 
