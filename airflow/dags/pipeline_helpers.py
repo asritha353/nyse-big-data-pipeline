@@ -10,7 +10,6 @@ from __future__ import annotations
 import io
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tarfile
@@ -137,9 +136,9 @@ def _copy_directory_from_container(
 ) -> None:
     stream, _ = container.get_archive(source)
     archive_bytes = b"".join(stream)
-    if destination.exists():
-        shutil.rmtree(destination)
     destination.mkdir(parents=True, exist_ok=True)
+
+    ownership_repaired = False
 
     with tarfile.open(fileobj=io.BytesIO(archive_bytes), mode="r:*") as archive:
         for member in archive.getmembers():
@@ -147,11 +146,46 @@ def _copy_directory_from_container(
             if relative is None or relative == Path() or not member.isfile():
                 continue
             target = destination / relative
-            target.parent.mkdir(parents=True, exist_ok=True)
             extracted = archive.extractfile(member)
             if extracted is None:
                 raise RuntimeError(f"Could not read archived member {member.name}")
-            target.write_bytes(extracted.read())
+            payload = extracted.read()
+            try:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(payload)
+            except PermissionError:
+                if ownership_repaired or not _repair_generated_output_ownership(
+                    container, destination
+                ):
+                    raise
+                ownership_repaired = True
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(payload)
+
+
+def _repair_generated_output_ownership(container, destination: Path) -> bool:
+    """Let the current Airflow UID replace outputs created earlier as root."""
+
+    current_container_id = os.environ.get("HOSTNAME")
+    if not current_container_id or not hasattr(container, "client"):
+        return False
+
+    try:
+        current_uid = (
+            os.getuid()
+            if hasattr(os, "getuid")
+            else int(os.environ.get("AIRFLOW_UID", "50000"))
+        )
+        current_gid = os.getgid() if hasattr(os, "getgid") else 0
+        current_container = container.client.containers.get(current_container_id)
+        result = current_container.exec_run(
+            ["chown", "-R", f"{current_uid}:{current_gid}", str(destination)],
+            user="0",
+            demux=True,
+        )
+    except Exception:
+        return False
+    return result.exit_code == 0
 
 
 def preflight() -> dict[str, str]:

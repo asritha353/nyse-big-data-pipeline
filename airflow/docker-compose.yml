@@ -11,6 +11,7 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-api-server:8080/execution/
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD:?Set AIRFLOW_DB_PASSWORD in .env}@airflow-postgres/airflow"
     AIRFLOW__API__SECRET_KEY: "${AIRFLOW_API_SECRET_KEY:?Set AIRFLOW_API_SECRET_KEY in .env}"
+    AIRFLOW__API_AUTH__JWT_SECRET: "${AIRFLOW_API_SECRET_KEY:?Set AIRFLOW_API_SECRET_KEY in .env}"
     NYSE_PROJECT_ROOT: /opt/project
     NYSE_POSTGRES_HOST: nyse-postgres
     NYSE_POSTGRES_PORT: "5432"

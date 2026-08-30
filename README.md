@@ -26,6 +26,7 @@ covariance/correlation analysis.
 
 | Check | Result |
 |---|---:|
+| Airflow DAG tasks / quality gates | 15 / 15 successful |
 | Raw and cleaned price rows | 15,120 |
 | Securities / stock symbols | 20 |
 | Trading dates | 756 |
@@ -70,6 +71,7 @@ nested Git repository while preserving the required configuration change under
 - Python 3.10 or newer
 - A Kaggle account for the source dataset
 - About 20 GB of free disk space for Docker images and data
+- About 8 GB of memory available to Docker; stop unrelated containers during a full DAG run
 
 The stack uses Airflow 3.3.1, Hadoop 3.3.6, Spark 3.5.3, Hive 3.1.3,
 PostgreSQL 16, Sqoop 1.4.7, PostgreSQL JDBC 42.7.7, and R 4.5.1.
