@@ -5,6 +5,7 @@ distributed analytics stack:
 
 ```mermaid
 flowchart LR
+    K[Airflow orchestration] -. schedules and validates .-> B
     A[Kaggle CSV] --> B[Python subset]
     B --> C[PostgreSQL staging]
     C --> D[Sqoop]
@@ -16,9 +17,10 @@ flowchart LR
     I --> J[R statistics + charts]
 ```
 
-The implementation demonstrates PostgreSQL ingestion, Sqoop transfer, HDFS
-storage, a required Spark RDD example, typed DataFrame cleaning, Parquet output,
-Hive joins and aggregations, and R covariance/correlation analysis.
+The implementation demonstrates Airflow orchestration, PostgreSQL ingestion,
+Sqoop transfer, HDFS storage, a required Spark RDD example, typed DataFrame
+cleaning, Parquet output, Hive joins and aggregations, and R
+covariance/correlation analysis.
 
 ## Verified results
 
@@ -43,6 +45,7 @@ volume.
 
 ```text
 .
+|-- airflow/             # LocalExecutor stack, DAG, helpers, and task logs
 |-- config/hadoop/       # tracked override for YARN MapReduce jobs
 |-- data/                # local raw and prepared data (CSVs ignored)
 |-- hive/                # external tables, views, validation, analytics, export
@@ -66,12 +69,68 @@ nested Git repository while preserving the required configuration change under
 - Windows PowerShell, Git, and Docker Desktop
 - Python 3.10 or newer
 - A Kaggle account for the source dataset
-- About 15 GB of free disk space for Docker images and data
+- About 20 GB of free disk space for Docker images and data
 
-The validated stack uses Hadoop 3.3.6, Spark 3.5.3, Hive 3.1.3, PostgreSQL 16,
-Sqoop 1.4.7, PostgreSQL JDBC 42.7.7, and R 4.5.1.
+The stack uses Airflow 3.3.1, Hadoop 3.3.6, Spark 3.5.3, Hive 3.1.3,
+PostgreSQL 16, Sqoop 1.4.7, PostgreSQL JDBC 42.7.7, and R 4.5.1.
 
-## Reproduce the pipeline
+## Airflow orchestration
+
+The `nyse_end_to_end` DAG is a manually triggered historical-data workflow with
+three visible TaskGroups:
+
+```text
+ingestion:  CSV -> PostgreSQL -> Sqoop -> HDFS validation
+processing: Spark -> Parquet validation -> Hive -> Hive validation
+analytics:  Hive export -> R -> final artifact validation
+```
+
+Every write is safe to rerun: PostgreSQL staging tables are truncated, Sqoop
+deletes its target directories, Spark overwrites Parquet, Hive recreates views
+and overwrites the export, and R replaces generated analysis outputs. Quality
+gates reconcile the expected 15,120 price rows and 20 symbols at each boundary.
+
+### Start Airflow
+
+Complete the infrastructure, PostgreSQL, JDBC, and raw-data preparation steps
+below once. Ensure `master`, `worker1`, `worker2`, `metastore`,
+`nyse-postgres`, and the Docker network `infrastructure_sparknet` are running.
+The custom Sqoop image and `r-base:4.5.1` image must also exist locally.
+
+If `.env` does not exist, create it and replace all three `change-me` values:
+
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
+
+```powershell
+docker compose --env-file .env -f .\airflow\docker-compose.yml build
+docker compose --env-file .env -f .\airflow\docker-compose.yml up airflow-init
+docker compose --env-file .env -f .\airflow\docker-compose.yml up -d `
+  airflow-api-server airflow-scheduler airflow-dag-processor
+
+docker compose --env-file .env -f .\airflow\docker-compose.yml ps
+docker compose --env-file .env -f .\airflow\docker-compose.yml exec `
+  airflow-scheduler airflow dags list
+```
+
+Open `http://localhost:8090`, locate `nyse_end_to_end`, and trigger it. The local
+demonstration uses Airflow's Simple Auth Manager with all-admin access; it must
+not be exposed outside the laptop. The DAG is intentionally unscheduled because
+the Kaggle source is a static historical snapshot.
+
+It can also be triggered from PowerShell:
+
+```powershell
+docker compose --env-file .env -f .\airflow\docker-compose.yml exec `
+  airflow-scheduler airflow dags trigger nyse_end_to_end
+```
+
+Airflow uses the Docker socket to invoke the existing Sqoop, Hadoop, Spark,
+Hive, and R containers. It does not contain duplicate transformation logic.
+
+## Manual stage-by-stage reproduction
 
 Run these commands from the repository root in PowerShell.
 

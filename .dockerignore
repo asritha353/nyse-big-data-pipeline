@@ -1,0 +1,7 @@
+**
+!requirements.txt
+!airflow/
+airflow/dags/
+airflow/logs/
+!airflow/Dockerfile
+!airflow/requirements.txt

@@ -1,0 +1,102 @@
+x-airflow-common: &airflow-common
+  build:
+    context: ..
+    dockerfile: airflow/Dockerfile
+  image: nyse-airflow:3.3.1
+  user: "${AIRFLOW_UID:-50000}:0"
+  environment: &airflow-common-environment
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_ALL_ADMINS: "true"
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-api-server:8080/execution/
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: "postgresql+psycopg2://airflow:${AIRFLOW_DB_PASSWORD:?Set AIRFLOW_DB_PASSWORD in .env}@airflow-postgres/airflow"
+    AIRFLOW__API__SECRET_KEY: "${AIRFLOW_API_SECRET_KEY:?Set AIRFLOW_API_SECRET_KEY in .env}"
+    NYSE_PROJECT_ROOT: /opt/project
+    NYSE_POSTGRES_HOST: nyse-postgres
+    NYSE_POSTGRES_PORT: "5432"
+    POSTGRES_DB: "${POSTGRES_DB:-nyse}"
+    POSTGRES_USER: "${POSTGRES_USER:-nyseuser}"
+    POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
+    HADOOP_MASTER_CONTAINER: "${HADOOP_MASTER_CONTAINER:-infrastructure-master-1}"
+    HADOOP_NETWORK: "${HADOOP_NETWORK:-infrastructure_sparknet}"
+    SQOOP_IMAGE: "${SQOOP_IMAGE:-nyse-sqoop:1.4.7}"
+    R_IMAGE: "${R_IMAGE:-r-base:4.5.1}"
+  volumes:
+    - ./dags:/opt/airflow/dags:ro
+    - ./logs:/opt/airflow/logs
+    - ..:/opt/project
+    - /var/run/docker.sock:/var/run/docker.sock
+  networks:
+    - default
+    - infrastructure_sparknet
+  depends_on:
+    airflow-postgres:
+      condition: service_healthy
+
+services:
+  airflow-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: "${AIRFLOW_DB_PASSWORD:?Set AIRFLOW_DB_PASSWORD in .env}"
+      POSTGRES_DB: airflow
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - airflow-postgres-data:/var/lib/postgresql/data
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command: -c "airflow db migrate"
+    restart: "no"
+
+  airflow-api-server:
+    <<: *airflow-common
+    command: api-server
+    ports:
+      - "8090:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --local"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    command: dag-processor
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  airflow-postgres-data:
+
+networks:
+  infrastructure_sparknet:
+    external: true
+    name: "${HADOOP_NETWORK:-infrastructure_sparknet}"
