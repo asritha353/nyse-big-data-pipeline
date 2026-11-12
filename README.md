@@ -10,7 +10,7 @@ flowchart LR
     B --> C[PostgreSQL staging]
     C --> D[Sqoop]
     D --> E[HDFS raw text]
-    E --> F[Spark RDD + DataFrame]
+    E --> F[Spark Scala: RDD + DataFrame]
     F --> G[HDFS Parquet]
     G --> H[Hive tables + views]
     H --> I[Hive CSV export]
@@ -231,9 +231,9 @@ target directory to `/data/nyse/securities_raw`.
 ### 5. Run Spark processing
 
 ```powershell
-docker cp .\spark\process_nyse.py infrastructure-master-1:/tmp/process_nyse.py
+docker cp .\spark\process_nyse.scala infrastructure-master-1:/tmp/process_nyse.scala
 docker compose -f .\infrastructure\docker-compose.yml exec master `
-  spark-submit --master spark://master:7077 /tmp/process_nyse.py
+  bash -lc "spark-shell --master spark://master:7077 -i /tmp/process_nyse.scala < /dev/null"
 
 docker compose -f .\infrastructure\docker-compose.yml exec master `
   hdfs dfs -ls /data/nyse/prices_clean

@@ -194,8 +194,8 @@ def preflight() -> dict[str, str]:
         root / "data" / "raw" / "prices.csv",
         root / "data" / "raw" / "securities.csv",
         root / "scripts" / "prepare_nyse_data.py",
-        root / "spark" / "process_nyse.py",
-        root / "spark" / "validate_nyse.py",
+        root / "spark" / "process_nyse.scala",
+        root / "spark" / "validate_nyse.scala",
         root / "hive" / "setup_hive.sql",
         root / "r" / "analyze_nyse.R",
     ]
@@ -386,16 +386,16 @@ def _copy_project_file_to_master(relative_path: str) -> str:
 
 
 def run_spark_processing() -> str:
-    script = _copy_project_file_to_master("spark/process_nyse.py")
-    output = _master_exec(f"spark-submit --master spark://master:7077 {script}")
+    script = _copy_project_file_to_master("spark/process_nyse.scala")
+    output = _master_exec(f"spark-shell --master spark://master:7077 -i {script} < /dev/null")
     if "CLEANED ROW COUNT: 15120" not in output:
         raise PipelineValidationError("Spark processing did not report 15,120 rows")
     return "/data/nyse/prices_clean"
 
 
 def validate_spark_output() -> str:
-    script = _copy_project_file_to_master("spark/validate_nyse.py")
-    output = _master_exec(f"spark-submit --master spark://master:7077 {script}")
+    script = _copy_project_file_to_master("spark/validate_nyse.scala")
+    output = _master_exec(f"spark-shell --master spark://master:7077 -i {script} < /dev/null")
     if "SPARK QUALITY GATE PASSED" not in output:
         raise PipelineValidationError("Independent Spark quality gate did not pass")
     return "spark_quality_passed"
